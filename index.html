@@ -638,8 +638,8 @@ const firebaseConfig = {
 /* =========================================================
    CONFIGURACIÓN DE CLOUDINARY (para subir capturas de pantalla)
    ========================================================= */
-const CLOUDINARY_CLOUD_NAME = "REEMPLAZA_AQUI";
-const CLOUDINARY_UPLOAD_PRESET = "REEMPLAZA_AQUI";
+const CLOUDINARY_CLOUD_NAME = "dtbcj7i9x";
+const CLOUDINARY_UPLOAD_PRESET = "bombonella_citas";
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
@@ -936,6 +936,11 @@ async function submitCita(e){
   btn.disabled = true; btn.textContent = 'Guardando...';
   try{
     const capturaUrl = await uploadCaptura(file);
+    if(file && !capturaUrl){
+      toast('No se pudo subir la imagen. Revisa que Cloudinary esté configurado y vuelve a intentar.');
+      btn.disabled = false; btn.textContent = 'Registrar cita';
+      return false;
+    }
     const sucursalId = document.getElementById('f_sucursal').value;
     await db.collection('citas').add({
       sucursalId,
@@ -1133,7 +1138,7 @@ function renderDashboard(citas){
   // Sucursales: evolución en el tiempo (solo admin, y solo si hay más de una sucursal seleccionada)
   const cardSuc = document.getElementById('sucursalCompareCard');
   const isAdminUser = currentPerfil && currentPerfil.rol === 'admin';
-  if(isAdminUser && selectedBranchIds.length > 1){
+  if(isAdminUser && selectedBranchIds.length >= 1){
     cardSuc.style.display = 'block';
     const sucNombres = Object.keys(bySuc).sort((a,b)=>bySuc[b]-bySuc[a]);
     const byDaySuc = {}; // { sucursalNombre: { fecha: count } }
