@@ -423,8 +423,8 @@ tr:last-child td{border-bottom:none;}
             <div class="grid2">
               <div class="field">
                 <label>Clave del anuncio</label>
-                <input type="text" id="f_clave" required placeholder="Escríbela, o pon 'No aplica' si no la encuentras">
-                <div class="hint" id="f_claveHint">Si no tienes la clave, escribe "No aplica" — pero entonces te vamos a pedir la captura de pantalla como evidencia.</div>
+                <input type="text" id="f_clave" required placeholder="Si aparece, escríbela. Si no, escribe 'No aplica'">
+                <div class="hint" id="f_claveHint">Si no aparece el código de campaña, adjunta una captura del inicio de la conversación en la que el prospecto solicitó información o realizó esta reservación.</div>
               </div>
               <div class="field">
                 <label id="f_capturaLabel">Captura de pantalla</label>
@@ -911,8 +911,8 @@ function updateClaveRequirement(){
     if(claveHint) claveHint.textContent = 'Como llegó sin referencia, sube la captura de cómo llegó el mensaje de WhatsApp de este cliente — es obligatoria.';
   } else {
     claveInput.required = true;
-    claveInput.placeholder = "Escríbela, o pon 'No aplica' si no la encuentras";
-    if(claveHint) claveHint.textContent = 'Si no tienes la clave, escribe "No aplica" — pero entonces te vamos a pedir la captura de pantalla como evidencia.';
+    claveInput.placeholder = "Si aparece, escríbela. Si no, escribe 'No aplica'";
+    if(claveHint) claveHint.textContent = 'Si no aparece el código de campaña, adjunta una captura del inicio de la conversación en la que el prospecto solicitó información o realizó esta reservación.';
   }
 }
 
@@ -968,7 +968,7 @@ async function submitCita(e){
     return false;
   }
   if(!tieneCodigo && !file){
-    toast('Como no pusiste un código válido, sube la captura de pantalla como evidencia');
+    toast('Como no aparece el código de campaña, adjunta la captura del inicio de la conversación');
     return false;
   }
 
