@@ -387,7 +387,6 @@ tr:last-child td{border-bottom:none;}
               <div class="chip-select" id="f_origenWhatsapp">
                 <div class="chip" data-val="facebook">Facebook</div>
                 <div class="chip" data-val="instagram">Instagram</div>
-                <div class="chip" data-val="tiktok">TikTok</div>
                 <div class="chip" data-val="sin_referencia">Sin referencia</div>
               </div>
             </div>
@@ -395,7 +394,7 @@ tr:last-child td{border-bottom:none;}
               <div class="field">
                 <label>Clave del anuncio</label>
                 <input type="text" id="f_clave" required placeholder="Escríbela, o pon 'No aplica' si no la encuentras">
-                <div class="hint">Si no tienes la clave, escribe "No aplica" — pero entonces te vamos a pedir la captura de pantalla como evidencia.</div>
+                <div class="hint" id="f_claveHint">Si no tienes la clave, escribe "No aplica" — pero entonces te vamos a pedir la captura de pantalla como evidencia.</div>
               </div>
               <div class="field">
                 <label id="f_capturaLabel">Captura de pantalla</label>
@@ -469,7 +468,7 @@ tr:last-child td{border-bottom:none;}
 
         <div class="chart-grid">
           <div class="card chart-card"><h3>Distribución de edades</h3><p class="desc">Rango de edad de los clientes atendidos</p><div class="chart-wrap"><canvas id="chartEdades"></canvas></div></div>
-          <div class="card chart-card" id="sucursalCompareCard"><h3>Citas por sucursal</h3><p class="desc">Comparativo entre sucursales</p><div class="chart-wrap"><canvas id="chartSucursales"></canvas></div></div>
+          <div class="card chart-card" id="sucursalCompareCard"><h3>Evolución por sucursal</h3><p class="desc">Citas por día, comparando tus sucursales en el período seleccionado</p><div class="chart-wrap"><canvas id="chartSucursales"></canvas></div></div>
         </div>
       </div>
 
@@ -857,8 +856,26 @@ function getChipVal(groupId){
 function toggleOrigenWhatsapp(){
   const isWa = getChipVal('f_canal') === 'whatsapp';
   document.getElementById('f_origenWhatsappWrap').style.display = isWa ? 'block' : 'none';
+  if(!isWa) updateClaveRequirement();
 }
-document.querySelectorAll('#f_origenWhatsapp .chip').forEach(c=>c.onclick=()=>selectChip('f_origenWhatsapp', c));
+document.querySelectorAll('#f_origenWhatsapp .chip').forEach(c=>c.onclick=()=>{ selectChip('f_origenWhatsapp', c); updateClaveRequirement(); });
+
+function updateClaveRequirement(){
+  const canal = getChipVal('f_canal');
+  const origenWa = getChipVal('f_origenWhatsapp');
+  const sinReferencia = canal === 'whatsapp' && origenWa === 'sin_referencia';
+  const claveInput = document.getElementById('f_clave');
+  const claveHint = document.getElementById('f_claveHint');
+  if(sinReferencia){
+    claveInput.required = false;
+    claveInput.placeholder = 'No aplica (WhatsApp sin referencia)';
+    if(claveHint) claveHint.textContent = 'Como llegó sin referencia, sube la captura de cómo llegó el mensaje de WhatsApp de este cliente — es obligatoria.';
+  } else {
+    claveInput.required = true;
+    claveInput.placeholder = "Escríbela, o pon 'No aplica' si no la encuentras";
+    if(claveHint) claveHint.textContent = 'Si no tienes la clave, escribe "No aplica" — pero entonces te vamos a pedir la captura de pantalla como evidencia.';
+  }
+}
 
 const NO_CODE_VALUES_UI = ['no aplica','no encontrado','sin codigo','sin código','n/a','na','no tiene','no'];
 function citaTieneCodigo(c){
@@ -906,6 +923,11 @@ async function submitCita(e){
   const NO_CODE_VALUES = ['no aplica','no encontrado','sin codigo','sin código','n/a','na','no tiene','no'];
   const tieneCodigo = claveRaw !== '' && !NO_CODE_VALUES.includes(claveRaw.toLowerCase());
   const file = document.getElementById('f_captura').files[0];
+  const origenWa = getChipVal('f_origenWhatsapp');
+  if(canal === 'whatsapp' && origenWa === 'sin_referencia' && !file){
+    toast('Como el WhatsApp llegó sin referencia, es obligatorio subir la captura de pantalla');
+    return false;
+  }
   if(!tieneCodigo && !file){
     toast('Como no pusiste un código válido, sube la captura de pantalla como evidencia');
     return false;
@@ -1108,16 +1130,38 @@ function renderDashboard(citas){
     options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, ticks:{precision:0}}}}
   });
 
-  // Sucursales compare (solo admin, y solo si hay más de una sucursal seleccionada)
+  // Sucursales: evolución en el tiempo (solo admin, y solo si hay más de una sucursal seleccionada)
   const cardSuc = document.getElementById('sucursalCompareCard');
   const isAdminUser = currentPerfil && currentPerfil.rol === 'admin';
   if(isAdminUser && selectedBranchIds.length > 1){
     cardSuc.style.display = 'block';
-    const sucEntries = Object.entries(bySuc).sort((a,b)=>b[1]-a[1]);
+    const sucNombres = Object.keys(bySuc).sort((a,b)=>bySuc[b]-bySuc[a]);
+    const byDaySuc = {}; // { sucursalNombre: { fecha: count } }
+    sucNombres.forEach(n => byDaySuc[n] = {});
+    citas.forEach(c=>{
+      const d = c.fechaCita?.toDate ? c.fechaCita.toDate() : new Date(c.fechaCita);
+      const key = d.toISOString().slice(0,10);
+      const n = c.sucursalNombre || '';
+      if(!byDaySuc[n]) byDaySuc[n] = {};
+      byDaySuc[n][key] = (byDaySuc[n][key]||0)+1;
+    });
+    const allDays = Array.from(new Set(citas.map(c=>{
+      const d = c.fechaCita?.toDate ? c.fechaCita.toDate() : new Date(c.fechaCita);
+      return d.toISOString().slice(0,10);
+    }))).sort();
     charts.sucursales = new Chart(document.getElementById('chartSucursales'), {
-      type:'bar',
-      data:{labels:sucEntries.map(s=>s[0]), datasets:[{data:sucEntries.map(s=>s[1]), backgroundColor:'#2B4C52', borderRadius:6}]},
-      options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, ticks:{precision:0}}}}
+      type:'line',
+      data:{
+        labels: allDays,
+        datasets: sucNombres.map((n,i) => ({
+          label: n,
+          data: allDays.map(d => byDaySuc[n][d] || 0),
+          borderColor: PALETTE[i % PALETTE.length],
+          backgroundColor: PALETTE[i % PALETTE.length],
+          tension: .3, pointRadius: 2, fill: false
+        }))
+      },
+      options:{plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true, ticks:{precision:0}}}}
     });
   } else {
     cardSuc.style.display = 'none';
